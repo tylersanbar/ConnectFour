@@ -1,0 +1,65 @@
+<?php
+
+namespace ConnectFourBot\Models;
+
+class Coordinates
+{
+    private int $row;
+    private int $column;
+
+    public function __construct(int $row, int $column)
+    {
+        $this->row = $row;
+        $this->column = $column;
+    }
+
+    public function getRow(): int
+    {
+        return $this->row;
+    }
+
+    public function getColumn(): int
+    {
+        return $this->column;
+    }
+
+    public function isAdjacent(Coordinates $needle): bool
+    {
+        return $this->isHorizontallyAdjacent($needle) || $this->isVerticallyAdjacent($needle) || $this->isDiagonallyAdjacent($needle);
+    }
+
+    public function isHorizontallyAdjacent(Coordinates $coordinates): bool
+    {
+        if($coordinates->getRow() != $this->getRow()){
+            return false;
+        }
+        if(abs($coordinates->getColumn() - $this->getColumn()) != 1){
+            return false;
+        }
+        return true;
+    }
+
+    public function isVerticallyAdjacent(Coordinates $coordinate): bool
+    {
+        if($coordinate->getColumn() != $this->getColumn()){
+            return false;
+        }
+        if(abs($coordinate->getRow() - $this->getRow()) != 1){
+            return false;
+        }
+        return true;
+    }
+
+    public function isDiagonallyAdjacent(Coordinates $coordinate): bool
+    {
+        if(abs($coordinate->getRow() - $this->getRow()) != 1){
+            return false;
+        }
+        if(abs($coordinate->getColumn() - $this->getColumn()) != 1){
+            return false;
+        }
+        return true;
+    }
+
+
+}

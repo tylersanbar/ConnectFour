@@ -1,0 +1,46 @@
+<?php
+
+namespace ConnectFourBot\Models;
+
+require_once 'GameState.php';
+
+class GameEngine
+{
+    private GameState $currentGameState;
+
+    public function __construct()
+    {
+        $this->currentGameState = new GameState();
+    }
+
+    public function takeTurn(int $column): void
+    {
+        $this->currentGameState = GameState::createNextState($column, $this->currentGameState);
+    }
+
+    public function getCurrentGameState(): GameState
+    {
+        return $this->currentGameState;
+    }
+
+    public function getCurrentTurnNumberString(): string
+    {
+        return "It is turn number : {$this->currentGameState->getTurnCounter()}";
+    }
+
+    public function getCurrentPlayerString(): string
+    {
+        return "Player {$this->currentGameState->getCurrentPlayer()}";
+    }
+
+    public function getCurrentStatusString(): string
+    {
+        return $this->currentGameState->getGameStatus()->toString();
+    }
+
+    public function getCurrentGridDisplayString(): string
+    {
+        return $this->currentGameState->getGridDisplayString();
+    }
+}
+

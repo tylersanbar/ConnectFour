@@ -1,0 +1,290 @@
+<?php
+
+namespace ConnectFourBot\Models;
+
+require_once 'IntegerEncodedCellStateGrid.php';
+require_once 'GameStatus.php';
+require_once 'Coordinates.php';
+
+use Error;
+
+class GameState extends IntegerEncodedCellStateGrid
+{
+    const COLUMN_FULL_ERROR_CODE = 0;
+
+    const EMPTY_CELL = 0;
+    const PLAYER_ONE = 1;
+    const PLAYER_TWO = 2;
+
+    const NUM_ROWS = 6;
+    const NUM_COLUMNS = 7;
+
+    private int $currentPlayer;
+    private int $turnCounter;
+    private ?Coordinates $coordinates;
+    private ?GameState $lastState;
+    private ?GameState $nextState;
+    private GameStatus $gameStatus;
+
+    public function __construct()
+    {
+        parent::__construct(self::NUM_ROWS, self::NUM_COLUMNS, 3);
+        $this->currentPlayer = 0;
+        $this->turnCounter = 0;
+        $this->gameStatus = GameStatus::TurnZero;
+    }
+
+    public static function createNextState(int $columnSelection, GameState $fromState): GameState
+    {
+        $nextState = clone $fromState;
+        $nextState->currentPlayer = $fromState->getNextPlayer();
+        $nextState->turnCounter = $fromState->getTurnCounter() + 1;
+        $nextState->lastState = $fromState;
+        $fromState->setNextState($nextState);
+        $nextState->coordinates = new Coordinates($nextState->getFirstEmptyRowInColumn($columnSelection), $columnSelection);
+        $nextState->setCellForCurrentPlayer();
+        $nextState->gameStatus = $nextState->computeAndSetGameStatus();
+        return $nextState;
+    }
+
+    private function setCellForCurrentPlayer(): void
+    {
+        $this->setCell($this->coordinates->getRow(), $this->coordinates->getColumn(), $this->currentPlayer);
+    }
+
+    /**
+     * @throws Error
+     */
+    private function getFirstEmptyRowInColumn(int $column): int
+    {
+        try{
+            $row = parent::getFirstRowInColumnWithCellState($column, self::EMPTY_CELL);
+        } catch (Error $e){
+            throw new Error("Column is full!", self::COLUMN_FULL_ERROR_CODE, $e);
+        }
+        return $row;
+    }
+
+    private function getNextPlayer(): int
+    {
+        if($this->currentPlayer === 0){
+            return 1;
+        }
+        return $this->currentPlayer === 1 ? 2 : 1;
+    }
+
+    private function computeAndSetGameStatus(): GameStatus
+    {
+        if($this->turnCounter < 7){
+            return GameStatus::Ongoing;
+        }
+        $winningPlayer = $this->findWinningPlayerIfExists();
+        if(!$winningPlayer){
+            if($this->turnCounter == $this->getTotalCellCount()){
+                $this->gameStatus = GameStatus::Stalemate;
+            } else {
+                $this->gameStatus = GameStatus::Ongoing;
+            }
+        } elseif ($winningPlayer == self::PLAYER_ONE){
+            $this->gameStatus = GameStatus::PlayerOneWin;
+        } else {
+            $this->gameStatus = GameStatus::PlayerTwoWin;
+        }
+        return $this->gameStatus;
+    }
+
+    private function findWinningPlayerIfExists(): int
+    {
+        $playedCoordinates = $this->getPlayedCoordinates();
+        self::findNeighborsInArray($playedCoordinates);
+        return 0;
+    }
+
+    private function findIfWinVertically(): bool
+    {
+        $coordinates = $this->getCoordinates();
+        if($coordinates->getRow() < 3){
+            return false;
+        }
+        $tokenCount = 1 + $this->getSouthInRowCount();
+        return $tokenCount >= 4;
+    }
+    private function findIfWinHorizontally(): bool
+    {
+        $tokenCount = 1 + $this->getEastInRowCount() + $this->getWestInRowCount();
+        return $tokenCount >= 4;
+    }
+    private function findIfWinDiagonally(): bool
+    {
+        $coordinates = $this->getCoordinates();
+        if($coordinates->getRow() < 3){
+            return false;
+        }
+        $tokenCountSeToNw = 1 + $this->getSouthEastInRowCount() + $this->getNorthWestInRowCount();
+        if($tokenCountSeToNw >= 4){
+            return true;
+        }
+        $tokenCountSwToNe = 1 + $this->getSouthWestInRowCount() + $this->getNorthEastInRowCount();
+        return $tokenCountSwToNe >= 4;
+    }
+    private function getEastInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getRow() < self::NUM_ROWS && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow() + 1, $coordinates->getColumn());
+        }
+        return $tokenCount;
+    }
+    private function getWestInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow() - 1, $coordinates->getColumn());
+        }
+        return $tokenCount;
+    }
+    private function getSouthInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow(), $coordinates->getColumn() - 1);
+        }
+        return $tokenCount;
+    }
+    private function getNorthEastInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow(), $coordinates->getColumn() - 1);
+        }
+        return $tokenCount;
+    }
+    private function getNorthWestInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow(), $coordinates->getColumn() - 1);
+        }
+        return $tokenCount;
+    }
+    private function getSouthEastInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow(), $coordinates->getColumn() - 1);
+        }
+        return $tokenCount;
+    }
+    private function getSouthWestInRowCount(): int
+    {
+        $tokenCount = 0;
+        $coordinates = $this->getCoordinates();
+        while($coordinates->getColumn() >= 0 && $this->getCell($coordinates->getRow(), $coordinates->getColumn()) == $this->currentPlayer)
+        {
+            $tokenCount++;
+            $coordinates = new Coordinates($coordinates->getRow(), $coordinates->getColumn() - 1);
+        }
+        return $tokenCount;
+    }
+
+    /**
+     * @param Coordinates $needle
+     * @param Coordinates[] $haystack
+     * @return array
+     */
+    private static function findNeighborsInArray(Coordinates $needle, array $haystack): array
+    {
+        $neighbors = [];
+        foreach ($haystack as $potentialNeighbor){
+            if($potentialNeighbor->isAdjacent($needle)){
+                $neighbors[] = $potentialNeighbor;
+            }
+        }
+        return $neighbors;
+    }
+
+    public function getPlayedCoordinates(?GameState $gameState = null, int $player = null): array
+    {
+        if ($gameState == null){
+            $gameState = $this;
+        }
+        if($gameState->getGameStatus() == GameStatus::TurnZero){
+            return [];
+        }
+        $currentCoordinates = $gameState->getCoordinates();
+        $nextCoordinates = $this->getPlayedCoordinates($gameState->getLastState());
+        if($player != null && $gameState->currentPlayer != $player){
+            return $nextCoordinates;
+        }
+        return array_merge([$currentCoordinates], $nextCoordinates);
+    }
+
+    public function getCurrentPlayer(): int
+    {
+        return $this->currentPlayer;
+    }
+
+    public function getTurnCounter(): int
+    {
+        return $this->turnCounter;
+    }
+
+    public function getColumn(): int
+    {
+        return $this->coordinates->getColumn();
+    }
+
+    public function getRow(): int
+    {
+        return $this->coordinates->getRow();
+    }
+
+    public function getCoordinates(): Coordinates
+    {
+        return $this->coordinates;
+    }
+
+    public function getLastState(): ?GameState
+    {
+        return $this->lastState;
+    }
+
+    public function setLastState(?GameState $lastState): void
+    {
+        $this->lastState = $lastState;
+    }
+
+    public function getNextState(): ?GameState
+    {
+        return $this->nextState;
+    }
+
+    public function setNextState(?GameState $nextState): void
+    {
+        $this->nextState = $nextState;
+    }
+
+    public function getGameStatus(): GameStatus
+    {
+        return $this->gameStatus;
+    }
+}
+

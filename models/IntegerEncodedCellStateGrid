@@ -1,0 +1,155 @@
+<?php
+
+namespace ConnectFourBot\Models;
+
+use Error;
+
+class IntegerEncodedCellStateGrid
+{
+    const INVALID_CELL_COORDINATES_ERROR_CODE = 0;
+    const INVALID_CELL_STATE_ERROR_CODE = 1;
+    const NO_CELL_STATE_FOUND_IN_COLUMN = 2;
+
+    protected array $encodedIntegerArray;
+
+    protected int $numRows;
+    protected int $numColumns;
+    protected int $numberOfCellStates;
+    private int $bitsPerCell;
+
+    public function __construct(int $numRows, int $numColumns, int $numberOfCellStates)
+    {
+        $this->numRows = $numRows;
+        $this->numColumns = $numColumns;
+        $this->numberOfCellStates = $numberOfCellStates;
+        $this->bitsPerCell = self::calculateBitsPerCell($numberOfCellStates);
+        $this->encodedIntegerArray = self::createEmptyEncodedIntegerArray($numRows, $numColumns, $numberOfCellStates);
+    }
+
+    private static function calculateBitsPerCell(int $numCellStates): int
+    {
+        return (int)ceil(log($numCellStates + 1, 2));
+    }
+
+    private static function calculateTotalBits(int $numRows, int $numCols, int $bitsPerCell): int
+    {
+        return $numRows * $numCols * $bitsPerCell;
+    }
+
+    private static function calculateNumberOfIntegers(int $totalBits): int
+    {
+        $bitsPerInteger = 64;
+        return (int)ceil($totalBits / $bitsPerInteger);
+    }
+
+    private static function createEmptyEncodedIntegerArray(int $numRows, int $numColumns, int $bitsPerCell): array
+    {
+        $totalBits = self::calculateTotalBits($numRows, $numColumns, $bitsPerCell);
+        $numberOfIntegers = self::calculateNumberOfIntegers($totalBits);
+        return array_fill(0, $numberOfIntegers, 0);
+    }
+
+    function setCell(int $row, int $col, int $cellState): void
+    {
+        $this->validateCellCoordinates($row, $col);
+        $this->validateCellState($cellState);
+        $cellIndex = $row * $this->numColumns + $col;
+        $intIndex = intdiv($cellIndex * $this->bitsPerCell, 64);
+        $bitPosition = ($cellIndex * $this->bitsPerCell) % 64;
+
+        // Create mask and set value
+        $mask = (1 << $this->bitsPerCell) - 1;
+        $this->encodedIntegerArray[$intIndex] &= ~($mask << $bitPosition); // Clear bits
+        $this->encodedIntegerArray[$intIndex] |= ($cellState << $bitPosition); // Set new value
+    }
+
+    function getCell(int $row, int $col): int
+    {
+        $this->validateCellCoordinates($row, $col);
+        $cellIndex = $row * $this->numColumns + $col;
+        $intIndex = intdiv($cellIndex * $this->bitsPerCell, 64);
+        $bitPosition = ($cellIndex * $this->bitsPerCell) % 64;
+
+        // Extract value
+        $mask = (1 << $this->bitsPerCell) - 1;
+        return ($this->encodedIntegerArray[$intIndex] >> $bitPosition) & $mask;
+    }
+
+    /**
+     * @throws Error
+     */
+    protected function getFirstRowInColumnWithCellState(int $col, int $cellState): int
+    {
+        $row = -1;
+        do{
+            if($row >= $this->numRows){
+                throw new Error("No cells exist in column $col with cell state {$cellState}.", self::NO_CELL_STATE_FOUND_IN_COLUMN);
+            }
+            $row++;
+            $cellValue = $this->getCell($row, $col);
+        }
+        while($cellValue != $cellState);
+        return $row;
+    }
+
+    /**
+     * @throws Error
+     */
+    private function validateCellCoordinates(int $row, int $col): void
+    {
+        if(!$this->isCellCoordinateValid($row, $col))
+        {
+            throw new Error('Invalid cell coordinates.', self::INVALID_CELL_COORDINATES_ERROR_CODE);
+        }
+    }
+
+    /**
+     * @throws Error
+     */
+    private function validateCellState(int $cellState): void
+    {
+        if(!$this->isCellStateValid($cellState))
+        {
+            throw new Error('Invalid cell state.', self::INVALID_CELL_STATE_ERROR_CODE);
+        }
+    }
+
+    private function isCellStateValid(int $cellState): bool
+    {
+        return $cellState <= $this->numberOfCellStates && $cellState > 0;
+    }
+
+    private function isCellCoordinateValid(int $row, int $col): bool
+    {
+        return $this->isRowValid($row) && $this->isColumnValid($col);
+    }
+
+    private function isRowValid(int $row): bool
+    {
+        return $row < $this->numRows;
+    }
+
+    private function isColumnValid(int $column): bool
+    {
+        return $column < $this->numColumns;
+    }
+
+    public function getGridDisplayString(): string
+    {
+        $gridString = '';
+        for ($row = $this->numRows - 1; $row >= 0; $row--) {
+            for ($col = 0; $col < $this->numColumns; $col++) {
+                $gridString .= '| ' . $this->getCell($row, $col) . ' ';
+            }
+            $gridString .= "|\n"; // New line at the end of each row
+        }
+        return $gridString;
+    }
+
+    public function getTotalCellCount(): int
+    {
+        return $this->numRows * $this->numColumns;
+    }
+}
+
+

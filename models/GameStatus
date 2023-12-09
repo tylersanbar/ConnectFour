@@ -1,0 +1,17 @@
+<?php
+
+namespace ConnectFourBot\Models;
+
+enum GameStatus: string
+{
+    case TurnZero = 'Turn Zero';
+    case Stalemate = 'Stalemate';
+    case Ongoing = 'Ongoing';
+    case PlayerOneWin = 'Player One Win';
+    case PlayerTwoWin = 'Player Two Win';
+
+    public function toString(): string
+    {
+        return $this->value;
+    }
+}

@@ -1,0 +1,50 @@
+<?php
+
+// Tell the Test UI that you are expecting cross-origin requests from it
+
+namespace ConnectFourBot;
+
+require_once('Models/GameEngine.php');
+require_once('Models/GameStatus.php');
+
+use ConnectFourBot\Models\GameEngine;
+
+header('Access-Control-Allow-Origin: http://hq-dev-wk1868.paycomhq.com');
+
+// Read the current game state from the request body
+$requestBody = file_get_contents('php://input');
+
+echo $requestBody;
+
+$gameEngine = new GameEngine();
+
+echo "Game has initiated\n";
+echo "It is turn {$gameEngine->getCurrentTurnNumberString()}\n";
+echo "Current player is {$gameEngine->getCurrentPlayerString()}\n";
+echo "Game status is {$gameEngine->getCurrentStatusString()}\n\n";
+
+const WINNING_SEQUENCE_P1 = [2, 2, 3, 3, 4, 4, 5, 5];
+$turnSequence = [2, 3, 4, 5, 5, 5];
+$turnSequence = WINNING_SEQUENCE_P1;
+foreach ($turnSequence as $turn){
+    $turnCounter = $gameEngine->getCurrentTurnNumberString();
+    $currentPlayer = $gameEngine->getCurrentPlayerString();
+    $currentPlayerTurnString = "$currentPlayer drops his token into column $turn.\n";
+    $gameEngine->takeTurn($turn);
+    $turnResult = 'Game status is ' . $gameEngine->getCurrentStatusString() . "\n\n";
+    $display = $gameEngine->getCurrentGridDisplayString();
+    echo $turnCounter . "\n";
+    echo $currentPlayerTurnString;
+    echo $display;
+    echo $turnResult;
+}
+//$playedCoordinates = print_r($gameEngine->getCurrentGameState()->getPlayedCoordinates(), true);
+//echo "Played coordinates are $playedCoordinates";
+// TODO 1 : Parse game state from request body
+
+// TODO 2 : Find a good move
+
+// TODO 3 : Echo out the good move
+
+// Here's an example bot that always picks the third column (not a great strategy, btw)
+echo "2";
